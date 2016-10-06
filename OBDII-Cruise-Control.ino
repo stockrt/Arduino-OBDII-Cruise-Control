@@ -128,18 +128,23 @@ void loop() {
   //btMonitSerial.listen();
   //if (btMonitSerial.available()) btSerial.write(btMonitSerial.read());
 
-  String serialRecv = "";
+  String serialRecv;
+  serialRecv = "empty";
 
   // Accept commands from serial terminals
   //btMonitSerial.listen(); // HC-06 port can be read now
   if (Serial.available()) {
     serialRecv = Serial.readString();
   }
-  if (serialRecv.startsWith("v=")) {
   //} else
   //if (btMonitSerial.available()) {
   //  serialRecv = btMonitSerial.readString();
   //}
+
+  // Commands received
+  if (serialRecv == "empty") {
+    serialPrintln("No command received");
+  } else if (serialRecv.startsWith("v=")) {
     targetVelocity = serialRecv.substring(2).toInt();
     serialPrint("ACK command (target velocity set): ");
     serialPrintln(serialRecv);
@@ -152,6 +157,7 @@ void loop() {
 
   serialPrint("Target velocity: ");
   serialPrintln(String(targetVelocity));
+  serialPrintln("");
 
   delay(1000);
 }
