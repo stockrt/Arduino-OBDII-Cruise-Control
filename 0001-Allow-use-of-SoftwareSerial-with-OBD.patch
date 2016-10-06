@@ -1,0 +1,32 @@
+From b2b99e249c4e21dee368edc41c3ca1f45779416f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Rog=C3=A9rio=20Carvalho=20Schneider?= <stockrt@gmail.com>
+Date: Thu, 6 Oct 2016 16:13:57 -0300
+Subject: [PATCH] Allow use of SoftwareSerial with OBD
+
+Permit to use btSerial for BT communication with OBDII leaving Serial free to
+monitor and send commands.
+---
+ sketchbook/libraries/OBD/OBD.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/sketchbook/libraries/OBD/OBD.h b/sketchbook/libraries/OBD/OBD.h
+index 4109533..83e9951 100644
+--- a/sketchbook/libraries/OBD/OBD.h
++++ b/sketchbook/libraries/OBD/OBD.h
+@@ -15,6 +15,13 @@
+ #define OBD_TIMEOUT_GPS 200 /* ms */
+ #define OBD_SERIAL_BAUDRATE 38400
+ 
++
++// Modifications to use with OBDII-Cruise-Control
++#include <SoftwareSerial.h>
++extern SoftwareSerial btSerial;
++#define OBDUART btSerial
++
++
+ #ifndef OBDUART
+ #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega168P__)
+ #define OBDUART Serial
+-- 
+2.8.4 (Apple Git-73)
+

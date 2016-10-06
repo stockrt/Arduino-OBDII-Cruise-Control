@@ -1,0 +1,18 @@
+diff --git a/sketchbook/libraries/OBD/OBD.h b/sketchbook/libraries/OBD/OBD.h
+index 4109533..83e9951 100644
+--- a/sketchbook/libraries/OBD/OBD.h
++++ b/sketchbook/libraries/OBD/OBD.h
+@@ -15,6 +15,13 @@
+ #define OBD_TIMEOUT_GPS 200 /* ms */
+ #define OBD_SERIAL_BAUDRATE 38400
+ 
++
++// Modifications to use with OBDII-Cruise-Control
++#include <SoftwareSerial.h>
++extern SoftwareSerial btSerial;
++#define OBDUART btSerial
++
++
+ #ifndef OBDUART
+ #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega168P__)
+ #define OBDUART Serial

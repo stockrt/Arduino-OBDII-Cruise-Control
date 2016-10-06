@@ -19,6 +19,11 @@
   AT+CMODE=0
   AT+BIND=0019,5D,24E54A
 
+  Patches:
+  - See OBD.h.patch (0001-Allow-use-of-SoftwareSerial-with-OBD.patch for Git)
+    Allow use of SoftwareSerial port for BT communication with OBDII leaving Serial free
+    to monitor and send commands.
+
   Author: Rogério Carvalho Schneider <stockrt@gmail.com>
 
   Tested on a Hyundai HB20 (Oct, 2016)
