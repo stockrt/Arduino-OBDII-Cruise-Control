@@ -33,6 +33,7 @@
 //#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
 
 int targetVelocity = 0;
+int targetRPM = 0;
 
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
@@ -135,6 +136,7 @@ void loop() {
   //btMonitSerial.listen(); // HC-06 port can be read now
   if (Serial.available()) {
     serialRecv = Serial.readString();
+    serialRecv.trim();
   }
   //} else
   //if (btMonitSerial.available()) {
@@ -143,21 +145,34 @@ void loop() {
 
   // Commands received
   if (serialRecv == "empty") {
-    serialPrintln("No command received");
+    serialPrint("No command received");
   } else if (serialRecv.startsWith("v=")) {
     targetVelocity = serialRecv.substring(2).toInt();
     serialPrint("ACK command (target velocity set): ");
-    serialPrintln(serialRecv);
+    serialPrint(String(targetVelocity));
+    serialPrint(" (");
+    serialPrint(serialRecv);
+    serialPrint(")");
+  } else if (serialRecv.startsWith("r=")) {
+    targetRPM = serialRecv.substring(2).toInt();
+    serialPrint("ACK command (target RPM set): ");
+    serialPrint(String(targetRPM));
+    serialPrint(" (");
+    serialPrint(serialRecv);
+    serialPrint(")");
   } else {
     serialPrint("Unknown command: ");
-    serialPrintln(serialRecv);
+    serialPrint(serialRecv);
   }
 
   //btSerial.listen(); // HC-05 port can be can read
 
+  serialPrintln("");
   serialPrint("Target velocity: ");
   serialPrintln(String(targetVelocity));
+  serialPrint("Target RPM: ");
+  serialPrintln(String(targetRPM));
   serialPrintln("");
 
-  delay(1000);
+  delay(2000);
 }
