@@ -54,18 +54,31 @@ void setup() {
 // Wait until we can communicate with OBDII adapter via HC-05 BlueTooth module
 void waitBT() {
   String recv;
+  int count;
 
   while (true) {
     btSerial.flush();
     btSerial.println("ATZ");
-    recv = btSerial.readString();
 
-    if (recv.indexOf("ELM327") != -1) {
-      btSerial.flush();
-      Serial.println("OBDII ready");
-      break;
+    count = 0;
+    while (count < 20) { // Wait response from OBDII for two seconds at most
+      if (btSerial.available()) break;
+      count++;
+      delay(100);
+    }
+
+    if (btSerial.available()) {
+      recv = btSerial.readString();
+
+      if (recv.indexOf("ELM327") != -1) {
+        btSerial.flush();
+        Serial.println("OBDII ready");
+        break;
+      } else {
+        Serial.println("OBDII not ready yet (waiting 1s to retry)");
+      }
     } else {
-      Serial.println("OBDII not ready yet (waiting 1s to retry)");
+      Serial.println("No response from OBDII (waiting 1s to retry)");
     }
 
     delay(1000);
