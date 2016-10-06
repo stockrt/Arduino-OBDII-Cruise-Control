@@ -1,6 +1,6 @@
 /*
-  Cruise control implementation.
-  Uses PID controller in a closed-loop system.
+  Cruise control implementation. Uses PID controller in a closed-loop system.
+  This version only controls throtle, no brakes.
 
   Hardware:
   - Arduino Uno R3
