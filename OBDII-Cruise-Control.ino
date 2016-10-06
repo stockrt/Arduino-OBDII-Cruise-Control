@@ -29,20 +29,20 @@
 
 #define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBD)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
-#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
-#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
+//#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
+//#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
 
 int targetVelocity = 0;
 
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
-SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
+//SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
 Timer t;
 
 void setup() {
   // Serial config
   Serial.begin(38400);
   btSerial.begin(38400);
-  btMonitSerial.begin(9600);
+  //btMonitSerial.begin(9600);
 
   serialPrintln("Initializing...");
 
@@ -51,8 +51,8 @@ void setup() {
   pinMode(OBD_TxD, OUTPUT);
 
   // HC-06 communication to serial monitor
-  pinMode(MONIT_RxD, INPUT);
-  pinMode(MONIT_TxD, OUTPUT);
+  //pinMode(MONIT_RxD, INPUT);
+  //pinMode(MONIT_TxD, OUTPUT);
 
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   waitBT();
@@ -67,7 +67,7 @@ void waitBT() {
   String btRecv;
   int count;
 
-  btSerial.listen();
+  //btSerial.listen();
   while (true) {
     btSerial.flush();
     btSerial.println("ATZ");
@@ -101,17 +101,17 @@ void waitBT() {
 
 void serialWrite(char msg) {
   Serial.write(msg);
-  btMonitSerial.write(msg);
+  //btMonitSerial.write(msg);
 }
 
 void serialPrint(String msg) {
   Serial.print(msg);
-  btMonitSerial.print(msg);
+  //btMonitSerial.print(msg);
 }
 
 void serialPrintln(String msg) {
   Serial.println(msg);
-  btMonitSerial.println(msg);
+  //btMonitSerial.println(msg);
 }
 
 void cruiseControl() {
@@ -131,13 +131,15 @@ void loop() {
   String serialRecv = "";
 
   // Accept commands from serial terminals
-  btMonitSerial.listen(); // HC-06 port can be read now
+  //btMonitSerial.listen(); // HC-06 port can be read now
   if (Serial.available()) {
     serialRecv = Serial.readString();
-  } else if (btMonitSerial.available()) {
-    serialRecv = btMonitSerial.readString();
   }
   if (serialRecv.startsWith("v=")) {
+  //} else
+  //if (btMonitSerial.available()) {
+  //  serialRecv = btMonitSerial.readString();
+  //}
     targetVelocity = serialRecv.substring(2).toInt();
     serialPrint("ACK command (target velocity set): ");
     serialPrintln(serialRecv);
@@ -145,7 +147,8 @@ void loop() {
     serialPrint("Unknown command: ");
     serialPrintln(serialRecv);
   }
-  btSerial.listen(); // HC-05 port can be can read
+
+  //btSerial.listen(); // HC-05 port can be can read
 
   serialPrint("Target velocity: ");
   serialPrintln(String(targetVelocity));
