@@ -39,10 +39,17 @@
 
 int targetVelocity = 0;
 int targetRPM = 0;
+int bridgeMode = 0;
 
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
 Timer t;
+
+#include <Arduino.h>
+#include <Wire.h>
+#include <OBD.h>
+
+COBD obd;
 
 void setup() {
   // Serial config
@@ -62,6 +69,8 @@ void setup() {
 
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   waitBT();
+
+  obd.begin();
 
   t.every(500, cruiseControl);
 
@@ -121,63 +130,80 @@ void serialPrintln(String msg) {
 }
 
 void cruiseControl() {
+  if (bridgeMode) return;
   serialPrintln("Cruising");
 }
 
 void loop() {
   t.update();
 
-  // Bridge mode (for debugging)
-  //btSerial.listen();
-  //if (btSerial.available()) serialWrite(btSerial.read());
-  //if (Serial.available()) btSerial.write(Serial.read());
-  //btMonitSerial.listen();
-  //if (btMonitSerial.available()) btSerial.write(btMonitSerial.read());
-
   String serialRecv;
-  serialRecv = "empty";
 
-  // Accept commands from serial terminals
-  //btMonitSerial.listen(); // HC-06 port can be read now
-  if (Serial.available()) {
-    serialRecv = Serial.readString();
-    serialRecv.trim();
-  }
-  //} else
-  //if (btMonitSerial.available()) {
-  //  serialRecv = btMonitSerial.readString();
-  //}
+  // Bridge mode (for debugging)
+  if (bridgeMode) {
+    //btSerial.listen();
+    if (btSerial.available()) serialWrite(btSerial.read());
+    if (Serial.available()) btSerial.write(Serial.read());
+    //btMonitSerial.listen();
+    //if (btMonitSerial.available()) btSerial.write(btMonitSerial.read());
 
-  // Commands received
-  if (serialRecv == "empty") {
-    serialPrint("No command received");
-  } else if (serialRecv.startsWith("v=")) {
-    targetVelocity = serialRecv.substring(2).toInt();
-    serialPrint("ACK command (target velocity set): ");
-    serialPrint(String(targetVelocity));
-    serialPrint(" (");
-    serialPrint(serialRecv);
-    serialPrint(")");
-  } else if (serialRecv.startsWith("r=")) {
-    targetRPM = serialRecv.substring(2).toInt();
-    serialPrint("ACK command (target RPM set): ");
-    serialPrint(String(targetRPM));
-    serialPrint(" (");
-    serialPrint(serialRecv);
-    serialPrint(")");
   } else {
-    serialPrint("Unknown command: ");
-    serialPrint(serialRecv);
+    serialRecv = "empty";
+
+    // Accept commands from serial terminals
+    //btMonitSerial.listen(); // HC-06 port can be read now
+    if (Serial.available()) {
+      serialRecv = Serial.readString();
+      serialRecv.trim();
+    }
+    //} else
+    //if (btMonitSerial.available()) {
+    //  serialRecv = btMonitSerial.readString();
+    //}
+
+    // Commands received
+    if (serialRecv == "empty") {
+      serialPrint("No command received");
+    } else if (serialRecv.startsWith("v=")) {
+      targetVelocity = serialRecv.substring(2).toInt();
+      serialPrint("ACK command (target velocity set): ");
+      serialPrint(String(targetVelocity));
+      serialPrint(" (");
+      serialPrint(serialRecv);
+      serialPrint(")");
+    } else if (serialRecv.startsWith("r=")) {
+      targetRPM = serialRecv.substring(2).toInt();
+      serialPrint("ACK command (target RPM set): ");
+      serialPrint(String(targetRPM));
+      serialPrint(" (");
+      serialPrint(serialRecv);
+      serialPrint(")");
+    } else if (serialRecv.startsWith("b=")) {
+      bridgeMode = serialRecv.substring(2).toInt();
+      serialPrint("ACK command (bridge mode set/unset): ");
+      serialPrint(String(bridgeMode));
+      serialPrint(" (");
+      serialPrint(serialRecv);
+      serialPrint(")");
+    } else {
+      serialPrint("Unknown command: ");
+      serialPrint(serialRecv);
+    }
+
+    //btSerial.listen(); // HC-05 port can be can read
+
+    serialPrintln("");
+    serialPrint("Target velocity: ");
+    serialPrintln(String(targetVelocity));
+    serialPrint("Target RPM: ");
+    serialPrintln(String(targetRPM));
+    serialPrintln("");
+
+    delay(2000);
+
+    int value;
+    if (obd.readPID(PID_RPM, value)) {
+      serialPrintln(String(value));
+    }
   }
-
-  //btSerial.listen(); // HC-05 port can be can read
-
-  serialPrintln("");
-  serialPrint("Target velocity: ");
-  serialPrintln(String(targetVelocity));
-  serialPrint("Target RPM: ");
-  serialPrintln(String(targetRPM));
-  serialPrintln("");
-
-  delay(2000);
 }
