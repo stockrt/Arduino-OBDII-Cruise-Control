@@ -42,7 +42,7 @@ void setup() {
   // Serial config
   Serial.begin(38400);
   btSerial.begin(38400);
-  btMonitSerial.begin(38400);
+  btMonitSerial.begin(9600);
 
   serialPrintln("Initializing...");
 
