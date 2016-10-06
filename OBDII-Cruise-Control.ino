@@ -61,10 +61,10 @@ void waitBT() {
     btSerial.println("ATZ");
 
     count = 0;
-    while (count < 20) { // Wait response from OBDII for two seconds at most
+    while (count < 200) { // Wait response from OBDII for two seconds at most
       if (btSerial.available()) break;
       count++;
-      delay(100);
+      delay(10);
     }
 
     if (btSerial.available()) {
