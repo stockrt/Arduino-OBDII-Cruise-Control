@@ -139,15 +139,17 @@ void loop() {
 
   String serialRecv;
 
-  // Bridge mode (for debugging)
+  // Bridge / bridgeMode = 1 / b=1 (for debugging)
   if (bridgeMode) {
     //btSerial.listen();
     if (btSerial.available()) serialWrite(btSerial.read());
     if (Serial.available()) btSerial.write(Serial.read());
     //btMonitSerial.listen();
     //if (btMonitSerial.available()) btSerial.write(btMonitSerial.read());
+  } // Bridge / bridgeMode = 1 / b=1
 
-  } else {
+  // No bridge / bridgeMode = 0 / b=0 (default)
+  else {
     serialRecv = "empty";
 
     // Accept commands from serial terminals
@@ -197,13 +199,16 @@ void loop() {
     serialPrintln(String(targetVelocity));
     serialPrint("Target RPM: ");
     serialPrintln(String(targetRPM));
-    serialPrintln("");
-
-    delay(2000);
 
     int value;
+    serialPrintln("Reading from ECU");
     if (obd.readPID(PID_RPM, value)) {
       serialPrintln(String(value));
+    } else {
+      serialPrintln("Could not read from ECU");
     }
-  }
+
+    serialPrintln("");
+    delay(2000);
+  } // No bridge / bridgeMode = 0 / b=0
 }
