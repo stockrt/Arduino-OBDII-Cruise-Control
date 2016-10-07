@@ -63,7 +63,7 @@ int brakePedalState = LOW;
 // 0: NO CONTROL
 // 1: SPEED
 // 2: RPM
-int controllingCode = 0;
+int controlCode = 0;
 
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
@@ -173,11 +173,11 @@ void readPedals() {
   brakePedalState = digitalRead(BRAKE_PIN);
 
   if (throtlePedalState == LOW) {
-    controllingCode = 0;
+    controlCode = 0;
     evaluateControl();
   }
   if (brakePedalState == LOW) {
-    controllingCode = 0;
+    controlCode = 0;
     evaluateControl();
   }
 }
@@ -190,17 +190,17 @@ void readPIDs() {
 
   if (! obd.readPID(PID_SPEED, currentSPEED)) {
     serialPrintln("ERROR: Could not read SPEED from ECU");
-    controllingCode = 0;
+    controlCode = 0;
     evaluateControl();
   }
   if (! obd.readPID(PID_RPM, currentRPM)) {
     serialPrintln("ERROR: Could not read RPM from ECU");
-    controllingCode = 0;
+    controlCode = 0;
     evaluateControl();
   }
   if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) {
     serialPrintln("ERROR: Could not read ETHANOL_FUEL from ECU");
-    controllingCode = 0;
+    controlCode = 0;
     evaluateControl();
   }
 }
@@ -209,7 +209,7 @@ void evaluateControl() {
   //serialPrintln("");
   //serialPrintln("*** Evaluating control code ***");
 
-  switch (controllingCode) {
+  switch (controlCode) {
     case 0: // NO CONTROL
       break;
     case 1: // SPEED
@@ -228,7 +228,7 @@ void showStatus() {
   serialPrintln("*** STATUS ***");
 
   serialPrint("Controlling code: ");
-  serialPrint(String(controllingCode));
+  serialPrint(String(controlCode));
   serialPrintln("");
 
   serialPrint("Bridge mode: ");
@@ -300,7 +300,7 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
-      controllingCode = 1;
+      controlCode = 1;
       evaluateControl();
     } else if (serialRecv.startsWith("r=")) {
       targetRPM = serialRecv.substring(2).toInt();
@@ -309,7 +309,7 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
-      controllingCode = 2;
+      controlCode = 2;
       evaluateControl();
     } else if (serialRecv.startsWith("b=")) {
       bridgeMode = serialRecv.substring(2).toInt();
@@ -318,7 +318,7 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
-      controllingCode = 0;
+      controlCode = 0;
       evaluateControl();
     } else if (serialRecv.startsWith("d=")) {
       serialPrint("ACK command (disable control): ");
@@ -326,12 +326,12 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
-      controllingCode = 0;
+      controlCode = 0;
       evaluateControl();
     } else {
       serialPrint("ERROR: Unknown command: ");
       serialPrint(serialRecv);
-      controllingCode = 0;
+      controlCode = 0;
       evaluateControl();
     }
 
