@@ -12,8 +12,8 @@
   - RF 315/433 MHz four button sender and receiver pair
   - ELM327 OBDII BlueTooth adapter (OBD to RS232 interpreter v1.5)
   - Servo motor connected to pull car's throtle (TowerPro MG956R 12kg)
-  - Switch button on throtle
-  - Switch button on brake
+  - Switch button on throtle pedal
+  - Switch button on brake pedal
   - Automatic transmission car with standard OBDII connection (this is the most expensive hardware)
 
   Setup:
@@ -42,12 +42,22 @@
 //#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
 //#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
 
+#define THROTLE_PIN 6
+#define BRAKE_PIN 7
+
 int currentSPEED = 0;
 int targetSPEED = 0;
 int currentRPM = 0;
 int targetRPM = 0;
 int ethanol = -1;
+
 int bridgeMode = 0;
+
+// - Using INPUT_PULLUP semantics and wiring for pedal buttons:
+// HIGH: driver is not using this pedal
+// LOW: driver is pressing the pedal
+int throtlePedalState = LOW;
+int brakePedalState = LOW;
 
 // - Controlling code
 // 0: NO CONTROL
@@ -79,6 +89,11 @@ void setup() {
   serialPrintln("");
   serialPrintln("* Initializing...");
 
+  // Pedal switches
+  serialPrintln("* Initializing pedal switches...");
+  pinMode(THROTLE_PIN, INPUT_PULLUP);
+  pinMode(BRAKE_PIN, INPUT_PULLUP);
+
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   serialPrintln("* Initializing OBDII BlueTooth connection...");
   waitBT();
@@ -88,6 +103,8 @@ void setup() {
   obd.begin();
 
   // Timers
+  serialPrintln("* Initializing timers...");
+  t.every(100, readPedals);
   t.every(300, readPIDs);
   t.every(300, evaluateControl);
   t.every(2000, showStatus);
@@ -148,11 +165,25 @@ void serialPrintln(String msg) {
   //btMonitSerial.println(msg);
 }
 
+void readPedals() {
+  throtlePedalState = digitalRead(THROTLE_PIN);
+  brakePedalState = digitalRead(BRAKE_PIN);
+
+  if (throtlePedalState == LOW) {
+    controllingCode = 0;
+    evaluateControl();
+  }
+  if (brakePedalState == LOW) {
+    controllingCode = 0;
+    evaluateControl();
+  }
+}
+
 void readPIDs() {
   if (bridgeMode) return;
 
-  serialPrintln("");
-  serialPrintln("*** Reading from ECU via OBDII ***");
+  //serialPrintln("");
+  //serialPrintln("*** Reading from ECU via OBDII ***");
 
   if (! obd.readPID(PID_SPEED, currentSPEED)) {
     serialPrintln("ERROR: Could not read SPEED from ECU");
@@ -196,6 +227,14 @@ void showStatus() {
 
   serialPrint("Bridge mode: ");
   serialPrint(String(bridgeMode));
+  serialPrintln("");
+
+  serialPrint("THROTLE pedal state: ");
+  serialPrint(String(throtlePedalState));
+  serialPrintln("");
+
+  serialPrint("BRAKE pedal state: ");
+  serialPrint(String(brakePedalState));
   serialPrintln("");
 
   serialPrint("SPEED (current/target): ");
@@ -270,6 +309,14 @@ void loop() {
       bridgeMode = serialRecv.substring(2).toInt();
       serialPrint("ACK command (bridge mode set/unset): ");
       serialPrint(String(bridgeMode));
+      serialPrint(" (");
+      serialPrint(serialRecv);
+      serialPrint(")");
+      controllingCode = 0;
+      evaluateControl();
+    } else if (serialRecv.startsWith("d=")) {
+      serialPrint("ACK command (disable control): ");
+      serialPrint("true");
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
