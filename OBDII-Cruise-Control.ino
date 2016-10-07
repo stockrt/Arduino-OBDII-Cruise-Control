@@ -1,11 +1,15 @@
 /*
   Cruise control implementation. Uses PID controller in a closed-loop system.
-  This version only controls throtle, no brakes.
+  This version only controls throtle, not brakes.
+  The objective of this program is to keep vehicle's speed as close as the value set by the driver.
+  It can also keep RPM as set by the user via Serial, just for fun.
+  Commands issued via Serial have precedence over speed set via RF control.
 
   Hardware:
   - Arduino Uno R3
   - HC-05 BlueTooth module (zs-040) (connects to OBDII)
   - HC-06 BlueTooth module (JY-MCU) (connects to a serial terminal for monitoring and command)
+  - RF 315/433 MHz four button sender and receiver pair
   - ELM327 OBDII BlueTooth adapter (OBD to RS232 interpreter v1.5)
   - Servo motor connected to pull car's throtle (TowerPro MG956R 12kg)
   - Switch button on throtle
@@ -38,9 +42,18 @@
 //#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
 //#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
 
-int targetVelocity = 0;
+int currentSPEED = 0;
+int targetSPEED = 0;
+int currentRPM = 0;
 int targetRPM = 0;
+int ethanol = -1;
 int bridgeMode = 0;
+
+// - Controlling code
+// 0: NO CONTROL
+// 1: SPEED
+// 2: RPM
+int controllingCode = 0;
 
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
@@ -54,6 +67,7 @@ void setup() {
   btSerial.begin(38400);
   //btMonitSerial.begin(9600);
 
+  serialPrintln("");
   serialPrintln("Initializing...");
 
   // HC-05 communication to OBDII
@@ -69,7 +83,8 @@ void setup() {
 
   obd.begin();
 
-  t.every(500, cruiseControl);
+  t.every(500, readPIDs);
+  t.every(2000, showStatus);
 
   serialPrintln("System initialized");
 }
@@ -126,9 +141,47 @@ void serialPrintln(String msg) {
   //btMonitSerial.println(msg);
 }
 
-void cruiseControl() {
+void readPIDs() {
   if (bridgeMode) return;
-  serialPrintln("Cruising");
+
+  serialPrintln("");
+  serialPrintln("*** Reading from ECU via OBDII ***");
+
+  if (! obd.readPID(PID_SPEED, currentSPEED)) serialPrintln("Could not read SPEED from ECU");
+  if (! obd.readPID(PID_RPM, currentRPM)) serialPrintln("Could not read RPM from ECU");
+  if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) serialPrintln("Could not read ETHANOL_FUEL from ECU");
+}
+
+void showStatus() {
+  if (bridgeMode) return;
+
+  serialPrintln("");
+  serialPrintln("*** STATUS ***");
+
+  serialPrint("Controlling code: ");
+  serialPrint(String(controllingCode));
+  serialPrintln("");
+
+  serialPrint("Bridge mode: ");
+  serialPrint(String(bridgeMode));
+  serialPrintln("");
+
+  serialPrint("SPEED (current/target): ");
+  serialPrint(String(currentSPEED));
+  serialPrint("/");
+  serialPrint(String(targetSPEED));
+  serialPrintln("");
+
+  serialPrint("RPM (current/target): ");
+  serialPrint(String(currentRPM));
+  serialPrint("/");
+  serialPrint(String(targetRPM));
+  serialPrintln("");
+
+  serialPrint("ETHANOL: ");
+  serialPrint(String(ethanol));
+  serialPrint("%");
+  serialPrintln("");
 }
 
 void loop() {
@@ -162,14 +215,15 @@ void loop() {
 
     // Commands received
     if (serialRecv == "empty") {
-      serialPrint("No command received");
-    } else if (serialRecv.startsWith("v=")) {
-      targetVelocity = serialRecv.substring(2).toInt();
-      serialPrint("ACK command (target velocity set): ");
-      serialPrint(String(targetVelocity));
+      //serialPrint("No command received");
+    } else if (serialRecv.startsWith("s=")) {
+      targetSPEED = serialRecv.substring(2).toInt();
+      serialPrint("ACK command (target SPEED set): ");
+      serialPrint(String(targetSPEED));
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
+      controllingCode = 1;
     } else if (serialRecv.startsWith("r=")) {
       targetRPM = serialRecv.substring(2).toInt();
       serialPrint("ACK command (target RPM set): ");
@@ -177,6 +231,7 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
+      controllingCode = 2;
     } else if (serialRecv.startsWith("b=")) {
       bridgeMode = serialRecv.substring(2).toInt();
       serialPrint("ACK command (bridge mode set/unset): ");
@@ -184,28 +239,13 @@ void loop() {
       serialPrint(" (");
       serialPrint(serialRecv);
       serialPrint(")");
+      controllingCode = 0;
     } else {
       serialPrint("Unknown command: ");
       serialPrint(serialRecv);
+      controllingCode = 0;
     }
 
     //btSerial.listen(); // HC-05 port can be can read
-
-    serialPrintln("");
-    serialPrint("Target velocity: ");
-    serialPrintln(String(targetVelocity));
-    serialPrint("Target RPM: ");
-    serialPrintln(String(targetRPM));
-
-    int value;
-    serialPrintln("Reading from ECU");
-    if (obd.readPID(PID_RPM, value)) {
-      serialPrintln(String(value));
-    } else {
-      serialPrintln("Could not read from ECU");
-    }
-
-    serialPrintln("");
-    delay(2000);
   } // No bridge / bridgeMode = 0 / b=0
 }
