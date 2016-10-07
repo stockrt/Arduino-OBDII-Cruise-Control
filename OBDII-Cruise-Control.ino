@@ -34,6 +34,7 @@
 */
 
 #include <SoftwareSerial.h>
+#include <Servo.h>
 #include <Timer.h>
 #include <OBD.h>
 
@@ -41,9 +42,9 @@
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
 //#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
 //#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
-
 #define THROTLE_PIN 6
 #define BRAKE_PIN 7
+#define SERVO_PIN 8
 
 int currentSPEED = 0;
 int targetSPEED = 0;
@@ -59,16 +60,20 @@ int bridgeMode = 0;
 int throtlePedalState = LOW;
 int brakePedalState = LOW;
 
-// - Controlling code
+// Servo
+int servoPosition = 0;
+
+// - Control code
 // 0: NO CONTROL
 // 1: SPEED
 // 2: RPM
 int controlCode = 0;
 
+// Objects
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
-Timer t;
-
+Servo servo;
+Timer timer;
 COBD obd;
 
 void setup() {
@@ -94,6 +99,12 @@ void setup() {
   pinMode(THROTLE_PIN, INPUT_PULLUP);
   pinMode(BRAKE_PIN, INPUT_PULLUP);
 
+  // Servo for throtle control
+  serialPrintln("* Initializing throtle servo...");
+  pinMode(SERVO_PIN, OUTPUT);
+  servo.attach(SERVO_PIN);
+  servo.write(servoPosition);
+
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   serialPrintln("* Initializing OBDII BlueTooth connection...");
   waitBT();
@@ -104,10 +115,10 @@ void setup() {
 
   // Timers
   serialPrintln("* Initializing timers...");
-  t.every(100, readPedals);
-  t.every(300, readPIDs);
-  t.every(300, evaluateControl);
-  t.every(2000, showStatus);
+  timer.every(100, readPedals);
+  timer.every(300, readPIDs);
+  timer.every(300, evaluateControl);
+  timer.every(2000, showStatus);
 
   // Setup done
   serialPrintln("* System initialized!");
@@ -211,12 +222,16 @@ void evaluateControl() {
 
   switch (controlCode) {
     case 0: // NO CONTROL
+      servoPosition = 0;
+      servo.write(servoPosition);
       break;
     case 1: // SPEED
       break;
     case 2: // RPM
       break;
     default: // NO CONTROL
+      servoPosition = 0;
+      servo.write(servoPosition);
       break;
   }
 }
@@ -227,12 +242,16 @@ void showStatus() {
   serialPrintln("");
   serialPrintln("*** STATUS ***");
 
-  serialPrint("Controlling code: ");
+  serialPrint("CONTROL code: ");
   serialPrint(String(controlCode));
   serialPrintln("");
 
-  serialPrint("Bridge mode: ");
+  serialPrint("BRIDGE mode: ");
   serialPrint(String(bridgeMode));
+  serialPrintln("");
+
+  serialPrint("SERVO position: ");
+  serialPrint(String(servoPosition));
   serialPrintln("");
 
   serialPrint("THROTLE pedal state: ");
@@ -262,7 +281,7 @@ void showStatus() {
 }
 
 void loop() {
-  t.update();
+  timer.update();
 
   String serialRecv;
 
