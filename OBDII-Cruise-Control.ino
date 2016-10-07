@@ -113,6 +113,21 @@ void setup() {
   serialPrintln("* System initialized!");
 }
 
+void serialWrite(char msg) {
+  Serial.write(msg);
+  //btMonitSerial.write(msg);
+}
+
+void serialPrint(String msg) {
+  Serial.print(msg);
+  //btMonitSerial.print(msg);
+}
+
+void serialPrintln(String msg) {
+  Serial.println(msg);
+  //btMonitSerial.println(msg);
+}
+
 // Wait until we can communicate with OBDII adapter via HC-05 BlueTooth module
 void waitBT() {
   String btRecv;
@@ -150,22 +165,10 @@ void waitBT() {
   }
 }
 
-void serialWrite(char msg) {
-  Serial.write(msg);
-  //btMonitSerial.write(msg);
-}
-
-void serialPrint(String msg) {
-  Serial.print(msg);
-  //btMonitSerial.print(msg);
-}
-
-void serialPrintln(String msg) {
-  Serial.println(msg);
-  //btMonitSerial.println(msg);
-}
-
 void readPedals() {
+  //serialPrintln("");
+  //serialPrintln("*** Reading pedals ***");
+
   throtlePedalState = digitalRead(THROTLE_PIN);
   brakePedalState = digitalRead(BRAKE_PIN);
 
@@ -203,6 +206,9 @@ void readPIDs() {
 }
 
 void evaluateControl() {
+  //serialPrintln("");
+  //serialPrintln("*** Evaluating control code ***");
+
   switch (controllingCode) {
     case 0: // NO CONTROL
       break;
