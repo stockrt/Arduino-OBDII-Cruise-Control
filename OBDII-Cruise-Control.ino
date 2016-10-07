@@ -31,6 +31,7 @@
 
 #include <SoftwareSerial.h>
 #include <Timer.h>
+#include <OBD.h>
 
 #define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBD)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
@@ -44,10 +45,6 @@ int bridgeMode = 0;
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
 //SoftwareSerial btMonitSerial(MONIT_RxD, MONIT_TxD);
 Timer t;
-
-#include <Arduino.h>
-#include <Wire.h>
-#include <OBD.h>
 
 COBD obd;
 
