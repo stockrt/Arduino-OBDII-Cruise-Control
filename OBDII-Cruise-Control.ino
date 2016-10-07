@@ -37,7 +37,7 @@
 #include <Timer.h>
 #include <OBD.h>
 
-#define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBD)
+#define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBDII)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
 //#define MONIT_RxD 4 // Arduino pin connected to Tx of HC-06 (MONIT)
 //#define MONIT_TxD 5 // Arduino pin connected to Rx of HC-06
@@ -64,29 +64,36 @@ COBD obd;
 void setup() {
   // Serial config
   Serial.begin(38400);
-  btSerial.begin(38400);
-  //btMonitSerial.begin(9600);
-
-  serialPrintln("");
-  serialPrintln("Initializing...");
 
   // HC-05 communication to OBDII
+  btSerial.begin(38400);
   pinMode(OBD_RxD, INPUT);
   pinMode(OBD_TxD, OUTPUT);
 
   // HC-06 communication to serial monitor
+  //btMonitSerial.begin(9600);
   //pinMode(MONIT_RxD, INPUT);
   //pinMode(MONIT_TxD, OUTPUT);
 
+  // Greetings
+  serialPrintln("");
+  serialPrintln("* Initializing...");
+
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
+  serialPrintln("* Initializing OBDII BlueTooth connection...");
   waitBT();
 
+  // OBDII
+  serialPrintln("* Initializing OBDII library btSerial connection...");
   obd.begin();
 
-  t.every(500, readPIDs);
+  // Timers
+  t.every(300, readPIDs);
+  t.every(300, evaluateControl);
   t.every(2000, showStatus);
 
-  serialPrintln("System initialized");
+  // Setup done
+  serialPrintln("* System initialized!");
 }
 
 // Wait until we can communicate with OBDII adapter via HC-05 BlueTooth module
@@ -113,13 +120,13 @@ void waitBT() {
 
       if (btRecv.indexOf("ELM327") != -1) {
         btSerial.flush();
-        serialPrintln("OBDII ready");
+        serialPrintln("INFO: OBDII ready");
         break;
       } else {
-        serialPrintln("OBDII not ready yet (waiting 1s to retry)");
+        serialPrintln("WARN: OBDII not ready yet (waiting 1s to retry)");
       }
     } else {
-      serialPrintln("No response from OBDII (waiting 1s to retry)");
+      serialPrintln("WARN: No response from OBDII (waiting 1s to retry)");
     }
 
     delay(1000);
@@ -147,9 +154,34 @@ void readPIDs() {
   serialPrintln("");
   serialPrintln("*** Reading from ECU via OBDII ***");
 
-  if (! obd.readPID(PID_SPEED, currentSPEED)) serialPrintln("Could not read SPEED from ECU");
-  if (! obd.readPID(PID_RPM, currentRPM)) serialPrintln("Could not read RPM from ECU");
-  if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) serialPrintln("Could not read ETHANOL_FUEL from ECU");
+  if (! obd.readPID(PID_SPEED, currentSPEED)) {
+    serialPrintln("ERROR: Could not read SPEED from ECU");
+    controllingCode = 0;
+    evaluateControl();
+  }
+  if (! obd.readPID(PID_RPM, currentRPM)) {
+    serialPrintln("ERROR: Could not read RPM from ECU");
+    controllingCode = 0;
+    evaluateControl();
+  }
+  if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) {
+    serialPrintln("ERROR: Could not read ETHANOL_FUEL from ECU");
+    controllingCode = 0;
+    evaluateControl();
+  }
+}
+
+void evaluateControl() {
+  switch (controllingCode) {
+    case 0: // NO CONTROL
+      break;
+    case 1: // SPEED
+      break;
+    case 2: // RPM
+      break;
+    default: // NO CONTROL
+      break;
+  }
 }
 
 void showStatus() {
@@ -224,6 +256,7 @@ void loop() {
       serialPrint(serialRecv);
       serialPrint(")");
       controllingCode = 1;
+      evaluateControl();
     } else if (serialRecv.startsWith("r=")) {
       targetRPM = serialRecv.substring(2).toInt();
       serialPrint("ACK command (target RPM set): ");
@@ -232,6 +265,7 @@ void loop() {
       serialPrint(serialRecv);
       serialPrint(")");
       controllingCode = 2;
+      evaluateControl();
     } else if (serialRecv.startsWith("b=")) {
       bridgeMode = serialRecv.substring(2).toInt();
       serialPrint("ACK command (bridge mode set/unset): ");
@@ -240,10 +274,12 @@ void loop() {
       serialPrint(serialRecv);
       serialPrint(")");
       controllingCode = 0;
+      evaluateControl();
     } else {
-      serialPrint("Unknown command: ");
+      serialPrint("ERROR: Unknown command: ");
       serialPrint(serialRecv);
       controllingCode = 0;
+      evaluateControl();
     }
 
     //btSerial.listen(); // HC-05 port can be can read
