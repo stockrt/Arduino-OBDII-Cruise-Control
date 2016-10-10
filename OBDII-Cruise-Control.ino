@@ -5,6 +5,12 @@
   It can also keep RPM as set by the user via Serial, just for fun.
   Commands issued via Serial have precedence over speed set via RF control.
 
+  Commands (via Serial port):
+  - s=80    set target SPEED to 80
+  - r=1000  set target RPM to 1000
+  - p=10    set THROTLE servoPosition to 10 (degrees)
+  - d=<any> disable cruise control
+
   Hardware:
   - Arduino Uno R3
   - HC-05 BlueTooth module (zs-040) (connects to OBDII)
