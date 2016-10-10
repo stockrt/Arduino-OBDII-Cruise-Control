@@ -68,6 +68,7 @@ int servoPosition = 0;
 // 0: NO CONTROL
 // 1: SPEED
 // 2: RPM
+// 3: THROTLE servoPosition
 int controlCode = 0;
 
 // Objects
@@ -207,6 +208,8 @@ void evaluateControl() {
       break;
     case 2: // RPM
       break;
+    case 3: // THROTLE servoPosition
+      servo.write(servoPosition);
     default: // NO CONTROL
       servoPosition = 0;
       servo.write(servoPosition);
@@ -281,6 +284,15 @@ void loop() {
     Serial.print(serialRecv);
     Serial.print(F(")"));
     controlCode = 2;
+    evaluateControl();
+  } else if (serialRecv.startsWith(F("p="))) {
+    servoPosition = serialRecv.substring(2).toInt();
+    Serial.print(F("ACK command (THROTLE servoPosition set): "));
+    Serial.print(String(servoPosition));
+    Serial.print(F(" ("));
+    Serial.print(serialRecv);
+    Serial.print(F(")"));
+    controlCode = 3;
     evaluateControl();
   } else if (serialRecv.startsWith(F("d="))) {
     Serial.print(F("ACK command (disable control): "));
