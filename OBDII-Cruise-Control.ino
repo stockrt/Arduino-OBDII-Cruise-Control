@@ -91,37 +91,37 @@ void setup() {
   //pinMode(MONIT_TxD, OUTPUT);
 
   // Greetings
-  serialPrintln("");
-  serialPrintln("* Initializing...");
+  serialPrintln(F(""));
+  serialPrintln(F("* Initializing..."));
 
   // Pedal switches
-  serialPrintln("* Initializing pedal switches...");
+  serialPrintln(F("* Initializing pedal switches..."));
   pinMode(THROTLE_PIN, INPUT_PULLUP);
   pinMode(BRAKE_PIN, INPUT_PULLUP);
 
   // Servo for throtle control
-  serialPrintln("* Initializing throtle servo...");
+  serialPrintln(F("* Initializing throtle servo..."));
   pinMode(SERVO_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
   servo.write(servoPosition);
 
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
-  serialPrintln("* Initializing OBDII BlueTooth connection...");
+  serialPrintln(F("* Initializing OBDII BlueTooth connection..."));
   waitBT();
 
   // OBDII
-  serialPrintln("* Initializing OBDII library btSerial connection...");
+  serialPrintln(F("* Initializing OBDII library btSerial connection..."));
   obd.begin();
 
   // Timers
-  serialPrintln("* Initializing timers...");
+  serialPrintln(F("* Initializing timers..."));
   timer.every(100, readPedals);
   timer.every(300, readPIDs);
   timer.every(300, evaluateControl);
   timer.every(2000, showStatus);
 
   // Setup done
-  serialPrintln("* System initialized!");
+  serialPrintln(F("* System initialized!"));
 }
 
 void serialWrite(char msg) {
@@ -147,7 +147,7 @@ void waitBT() {
   //btSerial.listen();
   while (true) {
     btSerial.flush();
-    btSerial.println("ATZ");
+    btSerial.println(F("ATZ"));
 
     count = 0;
     while (count < 200) { // Wait response from OBDII for two seconds at most
@@ -161,15 +161,15 @@ void waitBT() {
     if (btSerial.available()) {
       btRecv = btSerial.readString();
 
-      if (btRecv.indexOf("ELM327") != -1) {
+      if (btRecv.indexOf(F("ELM327")) != -1) {
         btSerial.flush();
-        serialPrintln("INFO: OBDII ready");
+        serialPrintln(F("INFO: OBDII ready"));
         break;
       } else {
-        serialPrintln("WARN: OBDII not ready yet (waiting 1s to retry)");
+        serialPrintln(F("WARN: OBDII not ready yet (waiting 1s to retry)"));
       }
     } else {
-      serialPrintln("WARN: No response from OBDII (waiting 1s to retry)");
+      serialPrintln(F("WARN: No response from OBDII (waiting 1s to retry)"));
     }
 
     delay(1000);
@@ -177,8 +177,8 @@ void waitBT() {
 }
 
 void readPedals() {
-  //serialPrintln("");
-  //serialPrintln("*** Reading pedals ***");
+  //serialPrintln(F(""));
+  //serialPrintln(F("*** Reading pedals ***"));
 
   throtlePedalState = digitalRead(THROTLE_PIN);
   brakePedalState = digitalRead(BRAKE_PIN);
@@ -196,29 +196,29 @@ void readPedals() {
 void readPIDs() {
   if (bridgeMode) return;
 
-  //serialPrintln("");
-  //serialPrintln("*** Reading from ECU via OBDII ***");
+  //serialPrintln(F(""));
+  //serialPrintln(F("*** Reading from ECU via OBDII ***"));
 
   if (! obd.readPID(PID_SPEED, currentSPEED)) {
-    serialPrintln("ERROR: Could not read SPEED from ECU");
+    serialPrintln(F("ERROR: Could not read SPEED from ECU"));
     controlCode = 0;
     evaluateControl();
   }
   if (! obd.readPID(PID_RPM, currentRPM)) {
-    serialPrintln("ERROR: Could not read RPM from ECU");
+    serialPrintln(F("ERROR: Could not read RPM from ECU"));
     controlCode = 0;
     evaluateControl();
   }
   if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) {
-    serialPrintln("ERROR: Could not read ETHANOL_FUEL from ECU");
+    serialPrintln(F("ERROR: Could not read ETHANOL_FUEL from ECU"));
     controlCode = 0;
     evaluateControl();
   }
 }
 
 void evaluateControl() {
-  //serialPrintln("");
-  //serialPrintln("*** Evaluating control code ***");
+  //serialPrintln(F(""));
+  //serialPrintln(F("*** Evaluating control code ***"));
 
   switch (controlCode) {
     case 0: // NO CONTROL
@@ -239,45 +239,45 @@ void evaluateControl() {
 void showStatus() {
   if (bridgeMode) return;
 
-  serialPrintln("");
-  serialPrintln("*** STATUS ***");
+  serialPrintln(F(""));
+  serialPrintln(F("*** STATUS ***"));
 
-  serialPrint("CONTROL code: ");
+  serialPrint(F("CONTROL code: "));
   serialPrint(String(controlCode));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("BRIDGE mode: ");
+  serialPrint(F("BRIDGE mode: "));
   serialPrint(String(bridgeMode));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("SERVO position: ");
+  serialPrint(F("SERVO position: "));
   serialPrint(String(servoPosition));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("THROTLE pedal state: ");
+  serialPrint(F("THROTLE pedal state: "));
   serialPrint(String(throtlePedalState));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("BRAKE pedal state: ");
+  serialPrint(F("BRAKE pedal state: "));
   serialPrint(String(brakePedalState));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("SPEED (current/target): ");
+  serialPrint(F("SPEED (current/target): "));
   serialPrint(String(currentSPEED));
-  serialPrint("/");
+  serialPrint(F("/"));
   serialPrint(String(targetSPEED));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("RPM (current/target): ");
+  serialPrint(F("RPM (current/target): "));
   serialPrint(String(currentRPM));
-  serialPrint("/");
+  serialPrint(F("/"));
   serialPrint(String(targetRPM));
-  serialPrintln("");
+  serialPrintln(F(""));
 
-  serialPrint("ETHANOL: ");
+  serialPrint(F("ETHANOL: "));
   serialPrint(String(ethanol));
-  serialPrint("%");
-  serialPrintln("");
+  serialPrint(F("%"));
+  serialPrintln(F(""));
 }
 
 void loop() {
@@ -310,45 +310,45 @@ void loop() {
     //}
 
     // Commands received
-    if (serialRecv == "empty") {
-      //serialPrint("No command received");
-    } else if (serialRecv.startsWith("s=")) {
+    if (serialRecv == F("empty")) {
+      //serialPrint(F("No command received"));
+    } else if (serialRecv.startsWith(F("s="))) {
       targetSPEED = serialRecv.substring(2).toInt();
-      serialPrint("ACK command (target SPEED set): ");
+      serialPrint(F("ACK command (target SPEED set): "));
       serialPrint(String(targetSPEED));
-      serialPrint(" (");
+      serialPrint(F(" ("));
       serialPrint(serialRecv);
-      serialPrint(")");
+      serialPrint(F(")"));
       controlCode = 1;
       evaluateControl();
-    } else if (serialRecv.startsWith("r=")) {
+    } else if (serialRecv.startsWith(F("r="))) {
       targetRPM = serialRecv.substring(2).toInt();
-      serialPrint("ACK command (target RPM set): ");
+      serialPrint(F("ACK command (target RPM set): "));
       serialPrint(String(targetRPM));
-      serialPrint(" (");
+      serialPrint(F(" ("));
       serialPrint(serialRecv);
-      serialPrint(")");
+      serialPrint(F(")"));
       controlCode = 2;
       evaluateControl();
-    } else if (serialRecv.startsWith("b=")) {
+    } else if (serialRecv.startsWith(F("b="))) {
       bridgeMode = serialRecv.substring(2).toInt();
-      serialPrint("ACK command (bridge mode set/unset): ");
+      serialPrint(F("ACK command (bridge mode set/unset): "));
       serialPrint(String(bridgeMode));
-      serialPrint(" (");
+      serialPrint(F(" ("));
       serialPrint(serialRecv);
-      serialPrint(")");
+      serialPrint(F(")"));
       controlCode = 0;
       evaluateControl();
-    } else if (serialRecv.startsWith("d=")) {
-      serialPrint("ACK command (disable control): ");
-      serialPrint("true");
-      serialPrint(" (");
+    } else if (serialRecv.startsWith(F("d="))) {
+      serialPrint(F("ACK command (disable control): "));
+      serialPrint(F("true"));
+      serialPrint(F(" ("));
       serialPrint(serialRecv);
-      serialPrint(")");
+      serialPrint(F(")"));
       controlCode = 0;
       evaluateControl();
     } else {
-      serialPrint("ERROR: Unknown command: ");
+      serialPrint(F("ERROR: Unknown command: "));
       serialPrint(serialRecv);
       controlCode = 0;
       evaluateControl();
