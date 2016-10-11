@@ -66,6 +66,15 @@
 #define MUST_HOLD_BUTTON_TO_CHANGE 500 // ms
 #define MIN_SPEED_TO_ACTIVATE 0 // Km/h
 #define MAX_WAIT_THROTLE_RELEASE 5000 // ms
+#define MAX_SERVO_POSITION 20
+
+#define Kp 0.5
+#define Ki 0.5
+#define Kd 0.5
+
+int previousError = 0;
+int integral = 0;
+unsigned long lastdt = millis();
 
 int currentSPEED = 0;
 int targetSPEED = 0;
@@ -239,6 +248,11 @@ void releaseControl() {
   servo.write(servoPosition);
   servo.detach();
 
+  // PID reset
+  previousError = 0;
+  integral = 0;
+  lastdt = millis();
+
   if (releaseControlFeedback) {
     releaseControlFeedback = false;
     tone(BUZZER_PIN, 200, 100);
@@ -273,6 +287,43 @@ void waitThrotleReleaseThenActivate() {
   }
 }
 
+void PID() {
+  int setpoint;
+  int processValue;
+  int error;
+  int derivative;
+  int controlValue;
+  unsigned long dt;
+
+  switch (controlCode) {
+    case 1: // SPEED
+      setpoint = targetSPEED;
+      processValue = currentSPEED;
+      break;
+    case 2: // RPM
+      setpoint = targetRPM;
+      processValue = currentRPM;
+      break;
+    default: // NO CONTROL
+      return;
+  }
+
+  dt = millis() - lastdt;
+
+  error = setpoint - processValue;
+  integral += error * dt;
+  derivative = (error - previousError) / dt;
+  controlValue = Kp * error + Ki * integral + Kd * derivative;
+  previousError = error;
+
+  servoPosition += controlValue;
+  if (servoPosition > MAX_SERVO_POSITION) {
+    servoPosition = MAX_SERVO_POSITION;
+  }
+
+  lastdt = millis();
+}
+
 void evaluateControl() {
   //Serial.println(F(""));
   //Serial.println(F("*** Evaluating control code ***"));
@@ -283,11 +334,13 @@ void evaluateControl() {
       break;
     case 1: // SPEED
       releaseControlFeedback = true;
+      PID();
       servo.write(servoPosition);
       servo.attach(SERVO_PIN);
       break;
     case 2: // RPM
       releaseControlFeedback = true;
+      PID();
       servo.write(servoPosition);
       servo.attach(SERVO_PIN);
       break;
