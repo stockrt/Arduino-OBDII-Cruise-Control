@@ -45,16 +45,21 @@
 
 #define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBDII)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
-#define BRAKE_PIN 6
-#define THROTLE_PIN 7
+
 #define SERVO_PIN 8
-
 #define BUZZER_PIN 9
+#define BRAKE_PIN 10
+#define THROTLE_PIN 11
 
-#define BUTTON_A_PIN A2
-#define BUTTON_B_PIN A0
-#define BUTTON_C_PIN A3
-#define BUTTON_D_PIN A1
+// D0 to A0
+// D1 to A1
+// D2 to A2
+// D3 to A3
+// VT to A4
+#define BUTTON_A_PIN A0
+#define BUTTON_B_PIN A1
+#define BUTTON_C_PIN A2
+#define BUTTON_D_PIN A3
 #define BUTTON_ANY_PIN A4
 
 #define MUST_HOLD_BUTTON_TO_ACTIVATE 2000 // ms
@@ -112,11 +117,6 @@ void setup() {
   Serial.println(F(""));
   Serial.println(F("* Initializing..."));
 
-  // Pedal switches
-  Serial.println(F("* Initializing pedal switches..."));
-  pinMode(BRAKE_PIN, INPUT_PULLUP);
-  pinMode(THROTLE_PIN, INPUT_PULLUP);
-
   // Servo for throtle control
   Serial.println(F("* Initializing throtle servo..."));
   pinMode(SERVO_PIN, OUTPUT);
@@ -125,6 +125,11 @@ void setup() {
 
   // Buzzer
   pinMode(BUZZER_PIN, OUTPUT);
+
+  // Pedal switches
+  Serial.println(F("* Initializing pedal switches..."));
+  pinMode(BRAKE_PIN, INPUT_PULLUP);
+  pinMode(THROTLE_PIN, INPUT_PULLUP);
 
   // RF control
   pinMode(BUTTON_A_PIN, INPUT);
