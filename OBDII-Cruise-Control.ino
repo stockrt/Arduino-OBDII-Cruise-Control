@@ -19,7 +19,7 @@
   - Servo motor connected to pull car's throtle (TowerPro MG956R 12kg)
   - Switch button on throtle pedal
   - Switch button on brake pedal
-  - Automatic transmission car with standard OBDII connection (this is the most expensive hardware)
+  - Automatic transmission vehicle with standard OBDII connection (this is the most expensive hardware)
 
   Setup:
   - HC-05 config (AT mode). Should be run only once:
@@ -76,7 +76,7 @@ int buttonPin[] = {BUTTON_A_PIN, BUTTON_B_PIN, BUTTON_C_PIN, BUTTON_D_PIN};
 int buttonState[] = {LOW, LOW, LOW, LOW};
 int lastButtonState[] = {LOW, LOW, LOW, LOW};
 unsigned long startButtonPressed[4];
-boolean buttonNewStateUsed[] = {false, false, false, false};
+boolean buttonStateChangeProcessed[] = {false, false, false, false};
 
 // - Control code
 // 0: NO CONTROL
@@ -84,6 +84,7 @@ boolean buttonNewStateUsed[] = {false, false, false, false};
 // 2: RPM
 // 3: THROTLE servoPosition
 int controlCode = 0;
+boolean releaseControlFeedback = true;
 
 // Objects
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
@@ -141,7 +142,14 @@ void setup() {
   timer.every(2000, showStatus);
 
   // Setup done
+  tone(BUZZER_PIN, 1000, 100);
+  delay(500);
+  tone(BUZZER_PIN, 1000, 100);
+  delay(500);
+  tone(BUZZER_PIN, 1000, 100);
+  delay(500);
   Serial.println(F("* System initialized!"));
+  Serial.println(F("* You may now issue commands: s=<int> r=<int> p=<int> d=<any>"));
 }
 
 // Wait until we can communicate with OBDII adapter via HC-05 BlueTooth module
@@ -149,7 +157,6 @@ void waitBT() {
   String btRecv;
   int count;
 
-  //btSerial.listen();
   while (true) {
     btSerial.flush();
     btSerial.println(F("ATZ"));
@@ -223,6 +230,16 @@ void releaseControl() {
   servoPosition = 0;
   servo.write(servoPosition);
   servo.detach();
+
+  if (releaseControlFeedback) {
+    releaseControlFeedback = false;
+    tone(BUZZER_PIN, 200, 100);
+    delay(200);
+    tone(BUZZER_PIN, 200, 100);
+    delay(200);
+    tone(BUZZER_PIN, 200, 100);
+    delay(200);
+  }
 }
 
 void evaluateControl() {
@@ -234,14 +251,19 @@ void evaluateControl() {
       releaseControl();
       break;
     case 1: // SPEED
+      releaseControlFeedback = true;
+      servo.write(servoPosition);
       servo.attach(SERVO_PIN);
       break;
     case 2: // RPM
+      releaseControlFeedback = true;
+      servo.write(servoPosition);
       servo.attach(SERVO_PIN);
       break;
     case 3: // THROTLE servoPosition
-      servo.attach(SERVO_PIN);
+      releaseControlFeedback = true;
       servo.write(servoPosition);
+      servo.attach(SERVO_PIN);
     default: // NO CONTROL
       releaseControl();
       break;
@@ -292,67 +314,60 @@ void loop() {
   // Commands from RF
   int i;
   unsigned long buttonHeldMillis;
-  for (i = 0; i < sizeof(buttonPin) / sizeof(int); i++) {
+  for (i = 0; i < sizeof(buttonPin) / sizeof(int); i++) { // for each button
     if (buttonPin[i] == BUTTON_A_PIN || buttonPin[i] == BUTTON_C_PIN) {
-      buttonHeldMillis = 3000;
+      buttonHeldMillis = 2500;
     } else {
-      buttonHeldMillis = 200;
+      buttonHeldMillis = 500;
     }
     if (digitalRead(buttonPin[i]) && digitalRead(BUTTON_ANY_PIN)) {
+      // Button pressed
       buttonState[i] = HIGH;
       if (buttonState[i] != lastButtonState[i]) {
-        lastButtonState[i] = HIGH;
+        lastButtonState[i] = buttonState[i];
         startButtonPressed[i] = millis();
       }
-      if (millis() - startButtonPressed[i] > buttonHeldMillis) {
+      if ((millis() - startButtonPressed[i] > buttonHeldMillis) && ! buttonStateChangeProcessed[i]) {
+        buttonStateChangeProcessed[i] = true;
         switch (buttonPin[i]) {
           case BUTTON_A_PIN:
-            if (! buttonNewStateUsed[i]) {
-              buttonNewStateUsed[i] = true;
-              Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
-              tone(BUZZER_PIN, 1500, 50);
-            }
-            if (! buttonNewStateUsed[i] && currentSPEED >= 40) {
-              buttonNewStateUsed[i] = true;
+            Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
+            tone(BUZZER_PIN, 1500, 50);
+            if (currentSPEED >= 40) {
               targetSPEED = currentSPEED;
               controlCode = 1;
               evaluateControl();
             }
             break;
-          case BUTTON_B_PIN:
-            if (! buttonNewStateUsed[i]) {
-              buttonNewStateUsed[i] = true;
-              Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
-              tone(BUZZER_PIN, 1500, 50);
-              targetSPEED += 5;
-            }
-            break;
           case BUTTON_C_PIN:
-            if (! buttonNewStateUsed[i]) {
-              buttonNewStateUsed[i] = true;
-              Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
-              tone(BUZZER_PIN, 1500, 50);
-            }
-            if (! buttonNewStateUsed[i] && currentSPEED >= 40 && targetSPEED > 0) {
-              buttonNewStateUsed[i] = true;
+            Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
+            tone(BUZZER_PIN, 1500, 50);
+            if (currentSPEED >= 40 && targetSPEED > 0) {
               controlCode = 1;
               evaluateControl();
             }
             break;
+          case BUTTON_B_PIN:
+            Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
+            tone(BUZZER_PIN, 1500, 50);
+            if (controlCode == 1) {
+              targetSPEED += 5;
+            }
+            break;
           case BUTTON_D_PIN:
-            if (! buttonNewStateUsed[i]) {
-              buttonNewStateUsed[i] = true;
-              Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
-              tone(BUZZER_PIN, 1500, 50);
+            Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
+            tone(BUZZER_PIN, 1500, 50);
+            if (controlCode == 1) {
               targetSPEED -= 5;
             }
             break;
         }
       }
     } else {
+      // Button not pressed
       buttonState[i] = LOW;
       lastButtonState[i] = LOW;
-      buttonNewStateUsed[i] = false;
+      buttonStateChangeProcessed[i] = false;
     }
   }
 
