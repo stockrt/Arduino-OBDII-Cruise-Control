@@ -17,8 +17,8 @@
   - RF 315/433 MHz four button sender and receiver pair
   - ELM327 OBDII BlueTooth adapter (OBD to RS232 interpreter v1.5)
   - Servo motor connected to pull car's throtle (TowerPro MG956R 12kg)
-  - Switch button on throtle pedal
   - Switch button on brake pedal
+  - Switch button on throtle pedal
   - Automatic transmission vehicle with standard OBDII connection (this is the most expensive hardware)
 
   Setup:
@@ -45,15 +45,22 @@
 
 #define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBDII)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
-#define THROTLE_PIN 6
-#define BRAKE_PIN 7
+#define BRAKE_PIN 6
+#define THROTLE_PIN 7
 #define SERVO_PIN 8
+
 #define BUZZER_PIN 9
+
 #define BUTTON_A_PIN A2
 #define BUTTON_B_PIN A0
 #define BUTTON_C_PIN A3
 #define BUTTON_D_PIN A1
 #define BUTTON_ANY_PIN A4
+
+#define MUST_HOLD_BUTTON_TO_ACTIVATE 2000 // ms
+#define MUST_HOLD_BUTTON_TO_CHANGE 500 // ms
+#define MIN_SPEED_TO_ACTIVATE 0 // Km/h
+#define MAX_WAIT_THROTLE_RELEASE 5000 // ms
 
 int currentSPEED = 0;
 int targetSPEED = 0;
@@ -64,8 +71,8 @@ int ethanol = -1;
 // - Using INPUT_PULLUP semantics and wiring for pedal buttons:
 // HIGH: driver is not using this pedal
 // LOW: driver is pressing the pedal
-int throtlePedalState = LOW;
 int brakePedalState = LOW;
+int throtlePedalState = LOW;
 
 // Servo
 int servoPosition = 0;
@@ -107,8 +114,8 @@ void setup() {
 
   // Pedal switches
   Serial.println(F("* Initializing pedal switches..."));
-  pinMode(THROTLE_PIN, INPUT_PULLUP);
   pinMode(BRAKE_PIN, INPUT_PULLUP);
+  pinMode(THROTLE_PIN, INPUT_PULLUP);
 
   // Servo for throtle control
   Serial.println(F("* Initializing throtle servo..."));
@@ -192,14 +199,10 @@ void readPedals() {
   //Serial.println(F(""));
   //Serial.println(F("*** Reading pedals ***"));
 
-  throtlePedalState = digitalRead(THROTLE_PIN);
   brakePedalState = digitalRead(BRAKE_PIN);
+  throtlePedalState = digitalRead(THROTLE_PIN);
 
-  if (throtlePedalState == LOW) {
-    controlCode = 0;
-    evaluateControl();
-  }
-  if (brakePedalState == LOW) {
+  if (brakePedalState == LOW || throtlePedalState == LOW) {
     controlCode = 0;
     evaluateControl();
   }
@@ -242,6 +245,29 @@ void releaseControl() {
   }
 }
 
+void waitThrotleReleaseThenActivate() {
+  unsigned long startWaitThrotleRelease = millis();
+
+  while (digitalRead(THROTLE_PIN) == LOW && (millis() - startWaitThrotleRelease < MAX_WAIT_THROTLE_RELEASE)) {}
+
+  releaseControlFeedback = true;
+
+  if (millis() - startWaitThrotleRelease < MAX_WAIT_THROTLE_RELEASE) {
+    Serial.println(F("*** Cruise control activated! ***"));
+    delay(500);
+    tone(BUZZER_PIN, 1500, 50);
+    delay(100);
+    tone(BUZZER_PIN, 1500, 50);
+    delay(100);
+    controlCode = 1;
+    evaluateControl();
+  } else {
+    Serial.println(F("ERROR: Wait for too long before releasing THROTLE pedal. Command cancelled!"));
+    controlCode = 0;
+    evaluateControl();
+  }
+}
+
 void evaluateControl() {
   //Serial.println(F(""));
   //Serial.println(F("*** Evaluating control code ***"));
@@ -278,16 +304,16 @@ void showStatus() {
   Serial.print(String(controlCode));
   Serial.println(F(""));
 
-  Serial.print(F("SERVO position: "));
-  Serial.print(String(servoPosition));
+  Serial.print(F("BRAKE pedal state: "));
+  Serial.print(String(brakePedalState));
   Serial.println(F(""));
 
   Serial.print(F("THROTLE pedal state: "));
   Serial.print(String(throtlePedalState));
   Serial.println(F(""));
 
-  Serial.print(F("BRAKE pedal state: "));
-  Serial.print(String(brakePedalState));
+  Serial.print(F("SERVO position: "));
+  Serial.print(String(servoPosition));
   Serial.println(F(""));
 
   Serial.print(F("SPEED (current/target): "));
@@ -316,9 +342,9 @@ void loop() {
   unsigned long buttonHeldMillis;
   for (i = 0; i < sizeof(buttonPin) / sizeof(int); i++) { // for each button
     if (buttonPin[i] == BUTTON_A_PIN || buttonPin[i] == BUTTON_C_PIN) {
-      buttonHeldMillis = 2500;
+      buttonHeldMillis = MUST_HOLD_BUTTON_TO_ACTIVATE;
     } else {
-      buttonHeldMillis = 500;
+      buttonHeldMillis = MUST_HOLD_BUTTON_TO_CHANGE;
     }
     if (digitalRead(buttonPin[i]) && digitalRead(BUTTON_ANY_PIN)) {
       // Button pressed
@@ -333,23 +359,24 @@ void loop() {
           case BUTTON_A_PIN:
             Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
             tone(BUZZER_PIN, 1500, 50);
-            if (currentSPEED >= 40) {
+            delay(100);
+            if (currentSPEED >= MIN_SPEED_TO_ACTIVATE) {
               targetSPEED = currentSPEED;
-              controlCode = 1;
-              evaluateControl();
+              waitThrotleReleaseThenActivate();
             }
             break;
           case BUTTON_C_PIN:
             Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
             tone(BUZZER_PIN, 1500, 50);
-            if (currentSPEED >= 40 && targetSPEED > 0) {
-              controlCode = 1;
-              evaluateControl();
+            delay(100);
+            if (currentSPEED >= MIN_SPEED_TO_ACTIVATE && targetSPEED > 0) {
+              waitThrotleReleaseThenActivate();
             }
             break;
           case BUTTON_B_PIN:
             Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
             tone(BUZZER_PIN, 1500, 50);
+            delay(100);
             if (controlCode == 1) {
               targetSPEED += 5;
             }
@@ -357,6 +384,7 @@ void loop() {
           case BUTTON_D_PIN:
             Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
             tone(BUZZER_PIN, 1500, 50);
+            delay(100);
             if (controlCode == 1) {
               targetSPEED -= 5;
             }
