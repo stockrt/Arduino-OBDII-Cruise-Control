@@ -48,6 +48,12 @@
 #define THROTLE_PIN 6
 #define BRAKE_PIN 7
 #define SERVO_PIN 8
+#define BUZZER_PIN 9
+#define BUTTON_A_PIN A2
+#define BUTTON_B_PIN A0
+#define BUTTON_C_PIN A3
+#define BUTTON_D_PIN A1
+#define BUTTON_ANY_PIN A4
 
 int currentSPEED = 0;
 int targetSPEED = 0;
@@ -63,6 +69,14 @@ int brakePedalState = LOW;
 
 // Servo
 int servoPosition = 0;
+
+// RF control
+// A, B,C, D, ANY (VT)
+int buttonPin[] = {BUTTON_A_PIN, BUTTON_B_PIN, BUTTON_C_PIN, BUTTON_D_PIN};
+int buttonState[] = {LOW, LOW, LOW, LOW};
+int lastButtonState[] = {LOW, LOW, LOW, LOW};
+unsigned long startButtonPressed[4];
+boolean buttonNewStateUsed[] = {false, false, false, false};
 
 // - Control code
 // 0: NO CONTROL
@@ -100,6 +114,16 @@ void setup() {
   pinMode(SERVO_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
   servo.write(servoPosition);
+
+  // Buzzer
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  // RF control
+  pinMode(BUTTON_A_PIN, INPUT);
+  pinMode(BUTTON_B_PIN, INPUT);
+  pinMode(BUTTON_C_PIN, INPUT);
+  pinMode(BUTTON_D_PIN, INPUT);
+  pinMode(BUTTON_ANY_PIN, INPUT);
 
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   Serial.println(F("* Initializing OBDII BlueTooth connection..."));
@@ -195,24 +219,31 @@ void readPIDs() {
   }
 }
 
+void releaseControl() {
+  servoPosition = 0;
+  servo.write(servoPosition);
+  servo.detach();
+}
+
 void evaluateControl() {
   //Serial.println(F(""));
   //Serial.println(F("*** Evaluating control code ***"));
 
   switch (controlCode) {
     case 0: // NO CONTROL
-      servoPosition = 0;
-      servo.write(servoPosition);
+      releaseControl();
       break;
     case 1: // SPEED
+      servo.attach(SERVO_PIN);
       break;
     case 2: // RPM
+      servo.attach(SERVO_PIN);
       break;
     case 3: // THROTLE servoPosition
+      servo.attach(SERVO_PIN);
       servo.write(servoPosition);
     default: // NO CONTROL
-      servoPosition = 0;
-      servo.write(servoPosition);
+      releaseControl();
       break;
   }
 }
@@ -258,7 +289,74 @@ void showStatus() {
 void loop() {
   timer.update();
 
-  // Commands
+  // Commands from RF
+  int i;
+  unsigned long buttonHeldMillis;
+  for (i = 0; i < sizeof(buttonPin) / sizeof(int); i++) {
+    if (buttonPin[i] == BUTTON_A_PIN || buttonPin[i] == BUTTON_C_PIN) {
+      buttonHeldMillis = 3000;
+    } else {
+      buttonHeldMillis = 200;
+    }
+    if (digitalRead(buttonPin[i]) && digitalRead(BUTTON_ANY_PIN)) {
+      buttonState[i] = HIGH;
+      if (buttonState[i] != lastButtonState[i]) {
+        lastButtonState[i] = HIGH;
+        startButtonPressed[i] = millis();
+      }
+      if (millis() - startButtonPressed[i] > buttonHeldMillis) {
+        switch (buttonPin[i]) {
+          case BUTTON_A_PIN:
+            if (! buttonNewStateUsed[i]) {
+              buttonNewStateUsed[i] = true;
+              Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
+              tone(BUZZER_PIN, 1500, 50);
+            }
+            if (! buttonNewStateUsed[i] && currentSPEED >= 40) {
+              buttonNewStateUsed[i] = true;
+              targetSPEED = currentSPEED;
+              controlCode = 1;
+              evaluateControl();
+            }
+            break;
+          case BUTTON_B_PIN:
+            if (! buttonNewStateUsed[i]) {
+              buttonNewStateUsed[i] = true;
+              Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
+              tone(BUZZER_PIN, 1500, 50);
+              targetSPEED += 5;
+            }
+            break;
+          case BUTTON_C_PIN:
+            if (! buttonNewStateUsed[i]) {
+              buttonNewStateUsed[i] = true;
+              Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
+              tone(BUZZER_PIN, 1500, 50);
+            }
+            if (! buttonNewStateUsed[i] && currentSPEED >= 40 && targetSPEED > 0) {
+              buttonNewStateUsed[i] = true;
+              controlCode = 1;
+              evaluateControl();
+            }
+            break;
+          case BUTTON_D_PIN:
+            if (! buttonNewStateUsed[i]) {
+              buttonNewStateUsed[i] = true;
+              Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
+              tone(BUZZER_PIN, 1500, 50);
+              targetSPEED -= 5;
+            }
+            break;
+        }
+      }
+    } else {
+      buttonState[i] = LOW;
+      lastButtonState[i] = LOW;
+      buttonNewStateUsed[i] = false;
+    }
+  }
+
+  // Commands from Serial
   String serialRecv;
   serialRecv = "empty";
   if (Serial.available()) {
