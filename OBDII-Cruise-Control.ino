@@ -362,35 +362,35 @@ void loop() {
         buttonStateChangeProcessed[i] = true;
         switch (buttonPin[i]) {
           case BUTTON_A_PIN:
-            Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
-            tone(BUZZER_PIN, 1500, 50);
-            delay(100);
             if (currentSPEED >= MIN_SPEED_TO_ACTIVATE) {
               targetSPEED = currentSPEED;
+              Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
+              tone(BUZZER_PIN, 1500, 50);
+              delay(100);
               waitThrotleReleaseThenActivate();
             }
             break;
           case BUTTON_C_PIN:
-            Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
-            tone(BUZZER_PIN, 1500, 50);
-            delay(100);
             if (currentSPEED >= MIN_SPEED_TO_ACTIVATE && targetSPEED > 0) {
+              Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
+              tone(BUZZER_PIN, 1500, 50);
+              delay(100);
               waitThrotleReleaseThenActivate();
             }
             break;
           case BUTTON_B_PIN:
-            Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
-            tone(BUZZER_PIN, 1500, 50);
-            delay(100);
             if (controlCode == 1) {
+              Serial.println(F("ACK Button B pressed (increase target SPEED by 5)"));
+              tone(BUZZER_PIN, 1500, 50);
+              delay(100);
               targetSPEED += 5;
             }
             break;
           case BUTTON_D_PIN:
-            Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
-            tone(BUZZER_PIN, 1500, 50);
-            delay(100);
             if (controlCode == 1) {
+              Serial.println(F("ACK Button D pressed (decrease target SPEED by 5)"));
+              tone(BUZZER_PIN, 1500, 50);
+              delay(100);
               targetSPEED -= 5;
             }
             break;
