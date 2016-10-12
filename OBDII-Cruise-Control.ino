@@ -159,7 +159,7 @@ void setup() {
   Serial.println(F("* Initializing timers..."));
   timer.every(100, readPedals);
   timer.every(300, readPIDs);
-  timer.every(300, evaluateControl);
+  timer.every(500, evaluateControl);
   timer.every(2000, showStatus);
 
   // Setup done
