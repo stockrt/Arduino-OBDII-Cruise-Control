@@ -342,6 +342,7 @@ void evaluateControl() {
       releaseControlFeedback = true;
       servo.write(servoPosition);
       servo.attach(SERVO_PIN);
+      break;
     default: // NO CONTROL
       releaseControl();
       break;
