@@ -80,7 +80,6 @@ int currentSPEED = 0;
 int targetSPEED = 0;
 int currentRPM = 0;
 int targetRPM = 0;
-int ethanol = -1;
 
 // - Using INPUT_PULLUP semantics and wiring for pedal buttons:
 // HIGH: driver is not using this pedal
@@ -236,11 +235,6 @@ void readPIDs() {
     controlCode = 0;
     evaluateControl();
   }
-  if (! obd.readPID(PID_ETHANOL_FUEL, ethanol)) {
-    Serial.println(F("ERROR: Could not read ETHANOL_FUEL from ECU"));
-    controlCode = 0;
-    evaluateControl();
-  }
 }
 
 void releaseControl() {
@@ -384,11 +378,6 @@ void showStatus() {
   Serial.print(String(currentRPM));
   Serial.print(F("/"));
   Serial.print(String(targetRPM));
-  Serial.println(F(""));
-
-  Serial.print(F("ETHANOL: "));
-  Serial.print(String(ethanol));
-  Serial.print(F("%"));
   Serial.println(F(""));
 }
 
