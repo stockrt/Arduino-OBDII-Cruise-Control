@@ -33,6 +33,11 @@
     Allow use of SoftwareSerial port for BT communication with OBDII leaving Serial free
     to monitor and send commands.
 
+  Material on PID Controllers:
+  - https://www.youtube.com/watch?v=O-OqgFE9SD4
+  - https://www.youtube.com/watch?v=UR0hOmjaHp0
+  - https://www.youtube.com/watch?v=XfAt6hNV8XM
+
   Author: Rogério Carvalho Schneider <stockrt@gmail.com>
 
   Tested on a Hyundai HB20 (Oct, 2016)
@@ -46,10 +51,10 @@
 #define OBD_RxD 2 // Arduino pin connected to Tx of HC-05 (OBDII)
 #define OBD_TxD 3 // Arduino pin connected to Rx of HC-05
 
-#define SERVO_PIN 8
-#define BUZZER_PIN 9
-#define BRAKE_PIN 10
-#define THROTLE_PIN 11
+#define SERVO_PIN 8 // Yellow
+#define BUZZER_PIN 9 // Yellow
+#define BRAKE_PIN 10 // Red
+#define THROTLE_PIN 11 // Green
 
 // D0 to A0
 // D1 to A1
@@ -62,18 +67,24 @@
 #define BUTTON_D_PIN A3
 #define BUTTON_ANY_PIN A4
 
-#define MUST_HOLD_BUTTON_TO_ACTIVATE 2000 // ms
-#define MUST_HOLD_BUTTON_TO_CHANGE 500 // ms
-#define MIN_SPEED_TO_ACTIVATE 0 // Km/h
+#define MUST_HOLD_BUTTON_TO_ACTIVATE 1000 // ms
+#define MUST_HOLD_BUTTON_TO_CHANGE 300 // ms
+#define MIN_SPEED_TO_ACTIVATE 60 // Km/h
 #define MAX_WAIT_THROTLE_RELEASE 5000 // ms
-#define MAX_SERVO_POSITION 20
+#define MAX_SERVO_POSITION 60
+#define ERROR_INFERIOR_TOLERANCE_SPEED 10; // Km/h
+#define ERROR_INFERIOR_TOLERANCE_RPM 100;
 
-#define Kp 0.5
-#define Ki 0.5
-#define Kd 0.5
+#define Kp_SPEED 0.1
+#define Ki_SPEED 0.0005
+#define Kd_SPEED 0.1
 
-int previousError = 0;
-int integral = 0;
+#define Kp_RPM 0.01
+#define Ki_RPM 0.00005
+#define Kd_RPM 0.01
+
+float integral = 0;
+float previousError = 0;
 unsigned long lastdt = millis();
 
 int currentSPEED = 0;
@@ -104,7 +115,7 @@ boolean buttonStateChangeProcessed[] = {false, false, false, false};
 // 2: RPM
 // 3: THROTLE servoPosition
 int controlCode = 0;
-boolean releaseControlFeedback = true;
+boolean releaseControlFeedback = false;
 
 // Objects
 SoftwareSerial btSerial(OBD_RxD, OBD_TxD);
@@ -124,44 +135,72 @@ void setup() {
   // Greetings
   Serial.println(F(""));
   Serial.println(F("* Initializing..."));
+  delay(300);
 
   // Servo for throtle control
   Serial.println(F("* Initializing throtle servo..."));
   pinMode(SERVO_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
   servo.write(servoPosition);
+  delay(300);
 
   // Buzzer
+  Serial.println(F("* Initializing buzzer..."));
   pinMode(BUZZER_PIN, OUTPUT);
-
-  // Pedal switches
-  Serial.println(F("* Initializing pedal switches..."));
-  pinMode(BRAKE_PIN, INPUT_PULLUP);
-  pinMode(THROTLE_PIN, INPUT_PULLUP);
+  delay(300);
 
   // RF control
+  Serial.println(F("* Initializing RF connection..."));
   pinMode(BUTTON_A_PIN, INPUT);
   pinMode(BUTTON_B_PIN, INPUT);
   pinMode(BUTTON_C_PIN, INPUT);
   pinMode(BUTTON_D_PIN, INPUT);
   pinMode(BUTTON_ANY_PIN, INPUT);
+  delay(300);
 
   // BlueTooth connection should be estabilished automatically if we have configured HC-05 correctly
   Serial.println(F("* Initializing OBDII BlueTooth connection..."));
   waitBT();
+  delay(300);
 
   // OBDII
   Serial.println(F("* Initializing OBDII library btSerial connection..."));
   obd.begin();
+  delay(300);
+
+  // Pedal switches
+  Serial.println(F("* Initializing pedal switches..."));
+
+  Serial.println(F("* Initializing brake pedal..."));
+  pinMode(BRAKE_PIN, INPUT_PULLUP);
+  while (true) {
+    if (digitalRead(BRAKE_PIN) == LOW) {
+      tone(BUZZER_PIN, 1000, 100);
+      break;
+    }
+  }
+  delay(300);
+
+  Serial.println(F("* Initializing throtle pedal..."));
+  pinMode(THROTLE_PIN, INPUT_PULLUP);
+  while (true) {
+    if (digitalRead(THROTLE_PIN) == LOW) {
+      tone(BUZZER_PIN, 1000, 100);
+      break;
+    }
+  }
+  delay(300);
 
   // Timers
   Serial.println(F("* Initializing timers..."));
-  timer.every(100, readPedals);
-  timer.every(300, readPIDs);
-  timer.every(500, evaluateControl);
-  timer.every(2000, showStatus);
+  timer.every(50, readPedals);
+  timer.every(3000, readPIDs);
+  timer.every(3000, evaluateControl);
+  timer.every(3000, showStatus);
+  delay(300);
 
   // Setup done
+  delay(1000);
   tone(BUZZER_PIN, 1000, 100);
   delay(500);
   tone(BUZZER_PIN, 1000, 100);
@@ -196,6 +235,8 @@ void waitBT() {
       if (btRecv.indexOf(F("ELM327")) != -1) {
         btSerial.flush();
         Serial.println(F("INFO: OBDII ready"));
+        tone(BUZZER_PIN, 1000, 100);
+        delay(500);
         break;
       } else {
         Serial.println(F("WARN: OBDII not ready yet (waiting 1s to retry)"));
@@ -240,11 +281,10 @@ void readPIDs() {
 void releaseControl() {
   servoPosition = 0;
   servo.write(servoPosition);
-  servo.detach();
 
   // PID reset
-  previousError = 0;
   integral = 0;
+  previousError = 0;
   lastdt = millis();
 
   if (releaseControlFeedback) {
@@ -281,40 +321,95 @@ void waitThrotleReleaseThenActivate() {
   }
 }
 
-void PID() {
+void PIDController() {
   int setpoint;
   int processValue;
+  int errorInferiorTolerance;
   int error;
-  int derivative;
-  int controlValue;
-  unsigned long dt;
+  float Kp, Ki, Kd;
+  float derivative;
+  float P, I, D;
+  float dt;
+  float controlValue;
 
   switch (controlCode) {
     case 1: // SPEED
       setpoint = targetSPEED;
       processValue = currentSPEED;
+      Kp = Kp_SPEED;
+      Ki = Ki_SPEED;
+      Kd = Kd_SPEED;
+      errorInferiorTolerance = ERROR_INFERIOR_TOLERANCE_SPEED;
       break;
     case 2: // RPM
       setpoint = targetRPM;
       processValue = currentRPM;
+      Kp = Kp_RPM;
+      Ki = Ki_RPM;
+      Kd = Kd_RPM;
+      errorInferiorTolerance = ERROR_INFERIOR_TOLERANCE_RPM;
       break;
     default: // NO CONTROL
       return;
   }
 
-  dt = millis() - lastdt;
+  dt = (millis() - lastdt) / 1000;
 
   error = setpoint - processValue;
-  integral += error * dt;
-  derivative = (error - previousError) / dt;
-  controlValue = Kp * error + Ki * integral + Kd * derivative;
-  previousError = error;
 
-  servoPosition += controlValue;
-  if (servoPosition > MAX_SERVO_POSITION) {
-    servoPosition = MAX_SERVO_POSITION;
+  integral += error * dt;
+  // If processValue is greater than setpoint, reset integral memory
+  if (error < 0) integral = 0;
+
+  if (dt == 0) {
+    derivative = 0;
+  } else {
+    derivative = (error - previousError) / dt;
   }
 
+  P = Kp * error; // Proportional
+  I = Ki * integral; // Integral
+  D = Kd * derivative; // Derivative
+  controlValue = P + I + D; // PID
+  // Round controlValue to act over servo angle
+  if (controlValue > 0 && controlValue < 1) controlValue = 1;
+  if (controlValue > -1 && controlValue < 0) controlValue = -1;
+
+  // Only if processValue is bellow setpoint for an amount greater than the inferior tolerance
+  // Or if we need to slow down
+  Serial.println(F(""));
+  if (error > errorInferiorTolerance || error < 0) {
+    servoPosition += controlValue;
+    if (servoPosition > MAX_SERVO_POSITION) {
+      servoPosition = MAX_SERVO_POSITION;
+    }
+    if (servoPosition < 0) {
+      servoPosition = 0;
+    }
+    Serial.println(F("* PID: Controller is ACTIVE"));
+  } else {
+    Serial.println(F("* PID: Controller is NOOP"));
+  }
+  Serial.print(F("* PID => P: "));
+  Serial.print(P);
+  Serial.print(F("  "));
+  Serial.print(F("I: "));
+  Serial.print(I);
+  Serial.print(F("  "));
+  Serial.print(F("D: "));
+  Serial.print(D);
+  Serial.print(F("  "));
+  Serial.print(F("Error: "));
+  Serial.print(error);
+  Serial.print(F("  "));
+  Serial.print(F("dt: "));
+  Serial.print(dt);
+  Serial.print(F("  "));
+  Serial.print(F("ControlValue: "));
+  Serial.print(controlValue);
+  Serial.println(F(""));
+
+  previousError = error;
   lastdt = millis();
 }
 
@@ -328,20 +423,17 @@ void evaluateControl() {
       break;
     case 1: // SPEED
       releaseControlFeedback = true;
-      PID();
+      PIDController();
       servo.write(servoPosition);
-      servo.attach(SERVO_PIN);
       break;
     case 2: // RPM
       releaseControlFeedback = true;
-      PID();
+      PIDController();
       servo.write(servoPosition);
-      servo.attach(SERVO_PIN);
       break;
     case 3: // THROTLE servoPosition
       releaseControlFeedback = true;
       servo.write(servoPosition);
-      servo.attach(SERVO_PIN);
       break;
     default: // NO CONTROL
       releaseControl();
@@ -386,9 +478,9 @@ void loop() {
   timer.update();
 
   // Commands from RF
-  int i;
+  unsigned int i;
   unsigned long buttonHeldMillis;
-  for (i = 0; i < sizeof(buttonPin) / sizeof(int); i++) { // for each button
+  for (i = 0; i < sizeof(buttonPin) / sizeof(unsigned int); i++) { // for each button
     if (buttonPin[i] == BUTTON_A_PIN || buttonPin[i] == BUTTON_C_PIN) {
       buttonHeldMillis = MUST_HOLD_BUTTON_TO_ACTIVATE;
     } else {
@@ -411,6 +503,8 @@ void loop() {
               tone(BUZZER_PIN, 1500, 50);
               delay(100);
               waitThrotleReleaseThenActivate();
+            } else {
+              releaseControl();
             }
             break;
           case BUTTON_C_PIN:
@@ -419,6 +513,8 @@ void loop() {
               tone(BUZZER_PIN, 1500, 50);
               delay(100);
               waitThrotleReleaseThenActivate();
+            } else {
+              releaseControl();
             }
             break;
           case BUTTON_B_PIN:
