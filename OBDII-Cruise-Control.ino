@@ -81,21 +81,24 @@
 #define BUTTON_D_PIN A3
 #define BUTTON_ANY_PIN A4
 
-#define MUST_HOLD_BUTTON_TO_ACTIVATE 1000 // ms
-#define MUST_HOLD_BUTTON_TO_CHANGE 300 // ms
-#define MIN_SPEED_TO_ACTIVATE 60 // Km/h
+#define MUST_HOLD_BUTTON_TO_ACTIVATE 0 // ms
+#define MUST_HOLD_BUTTON_TO_CHANGE 0 // ms
+#define MIN_SPEED_TO_ACTIVATE 40 // Km/h
 #define MAX_WAIT_THROTLE_RELEASE 5000 // ms
-#define MAX_SERVO_POSITION 60
-#define ERROR_INFERIOR_TOLERANCE_SPEED 10; // Km/h
+#define MIN_SERVO_POSITION 20
+#define MAX_SERVO_POSITION 160
+#define MAX_SERVO_ADVANCE_PER_STEP 20
+#define ERROR_INFERIOR_TOLERANCE_SPEED 0 ; // Km/h
 #define ERROR_INFERIOR_TOLERANCE_RPM 100;
 
-#define Kp_SPEED 0.1
+#define Kp_SPEED 1.5
 #define Ki_SPEED 0.0005
-#define Kd_SPEED 0.1
+#define Kd_SPEED 7
+#define Kp_SPEED_RETURN_FACTOR 1.5
 
-#define Kp_RPM 0.01
+#define Kp_RPM 0.05
 #define Ki_RPM 0.00005
-#define Kd_RPM 0.01
+#define Kd_RPM 0.05
 
 float integral = 0;
 float previousError = 0;
@@ -208,8 +211,8 @@ void setup() {
   // Timers
   Serial.println(F("* Initializing timers..."));
   timer.every(50, readPedals);
-  timer.every(3000, readPIDs);
-  timer.every(3000, evaluateControl);
+  timer.every(500, readPIDs);
+  timer.every(2000, evaluateControl);
   timer.every(3000, showStatus);
   delay(300);
 
@@ -336,7 +339,7 @@ void waitThrotleReleaseThenActivate() {
 }
 
 void PIDController() {
-  int setpoint;
+  int setPoint;
   int processValue;
   int errorInferiorTolerance;
   int error;
@@ -348,7 +351,7 @@ void PIDController() {
 
   switch (controlCode) {
     case 1: // SPEED
-      setpoint = targetSPEED;
+      setPoint = targetSPEED;
       processValue = currentSPEED;
       Kp = Kp_SPEED;
       Ki = Ki_SPEED;
@@ -356,7 +359,7 @@ void PIDController() {
       errorInferiorTolerance = ERROR_INFERIOR_TOLERANCE_SPEED;
       break;
     case 2: // RPM
-      setpoint = targetRPM;
+      setPoint = targetRPM;
       processValue = currentRPM;
       Kp = Kp_RPM;
       Ki = Ki_RPM;
@@ -367,12 +370,11 @@ void PIDController() {
       return;
   }
 
-  dt = (millis() - lastdt) / 1000;
+  dt = (millis() - lastdt) / 1000.0;
 
-  error = setpoint - processValue;
-
+  error = setPoint - processValue;
   integral += error * dt;
-  // If processValue is greater than setpoint, reset integral memory
+  // If processValue is greater than setPoint, reset integral memory
   if (error < 0) integral = 0;
 
   if (dt == 0) {
@@ -381,6 +383,12 @@ void PIDController() {
     derivative = (error - previousError) / dt;
   }
 
+  // If returning from SPEED overshoot
+  if (error < 0 && controlCode == 1) {
+    Kp = Kp * Kp_SPEED_RETURN_FACTOR;
+  }
+
+  // PID calc
   P = Kp * error; // Proportional
   I = Ki * integral; // Integral
   D = Kd * derivative; // Derivative
@@ -388,17 +396,19 @@ void PIDController() {
   // Round controlValue to act over servo angle
   if (controlValue > 0 && controlValue < 1) controlValue = 1;
   if (controlValue > -1 && controlValue < 0) controlValue = -1;
+  // Limit servo angle per iteration
+  if (controlValue > MAX_SERVO_ADVANCE_PER_STEP) controlValue = MAX_SERVO_ADVANCE_PER_STEP;
 
-  // Only if processValue is bellow setpoint for an amount greater than the inferior tolerance
+  // Only if processValue is bellow setPoint for an amount greater than the inferior tolerance
   // Or if we need to slow down
   Serial.println(F(""));
   if (error > errorInferiorTolerance || error < 0) {
     servoPosition += controlValue;
+    if (servoPosition < MIN_SERVO_POSITION) {
+      servoPosition = MIN_SERVO_POSITION;
+    }
     if (servoPosition > MAX_SERVO_POSITION) {
       servoPosition = MAX_SERVO_POSITION;
-    }
-    if (servoPosition < 0) {
-      servoPosition = 0;
     }
     Serial.println(F("* PID: Controller is ACTIVE"));
   } else {
@@ -507,7 +517,7 @@ void loop() {
         lastButtonState[i] = buttonState[i];
         startButtonPressed[i] = millis();
       }
-      if ((millis() - startButtonPressed[i] > buttonHeldMillis) && ! buttonStateChangeProcessed[i]) {
+      if (! buttonStateChangeProcessed[i]) {
         buttonStateChangeProcessed[i] = true;
         switch (buttonPin[i]) {
           case BUTTON_A_PIN:
@@ -518,6 +528,7 @@ void loop() {
               delay(100);
               waitThrotleReleaseThenActivate();
             } else {
+              releaseControlFeedback = true;
               releaseControl();
             }
             break;
@@ -528,6 +539,7 @@ void loop() {
               delay(100);
               waitThrotleReleaseThenActivate();
             } else {
+              releaseControlFeedback = true;
               releaseControl();
             }
             break;
