@@ -1,6 +1,6 @@
 /*
   Cruise control implementation. Uses PID controller in a closed-loop system.
-  This version only controls throtle, not brakes.
+  This version only controls throttle, not brakes.
   The objective of this program is to keep vehicle's speed as close as the value set by the driver.
   It can also keep RPM as set by the user via Serial, just for fun.
   Commands issued via Serial have precedence over speed set via RF control.
@@ -19,7 +19,7 @@
   Commands (via Serial port):
   - s=80    set target SPEED to 80
   - r=1000  set target RPM to 1000
-  - p=10    set THROTLE servoPosition to 10 (degrees)
+  - p=10    set THROTTLE servoPosition to 10 (degrees)
   - d=<any> disable cruise control
 
   Hardware:
@@ -27,9 +27,9 @@
   - HC-05 BlueTooth module (zs-040) (connects to OBDII)
   - RF 315/433 MHz four button sender and receiver pair
   - ELM327 OBDII BlueTooth adapter (OBD to RS232 interpreter v1.5)
-  - Servo motor connected to pull car's throtle (TowerPro MG956R 12kg)
+  - Servo motor connected to pull car's throttle (TowerPro MG956R 12kg)
   - Switch button on brake pedal
-  - Switch button on throtle pedal
+  - Switch button on throttle pedal
   - Automatic transmission vehicle with standard OBDII connection (this is the most expensive hardware)
 
   Setup:
@@ -68,7 +68,7 @@
 #define SERVO_PIN 8 // Yellow
 #define BUZZER_PIN 9 // Yellow
 #define BRAKE_PIN 10 // Red
-#define THROTLE_PIN 11 // Green
+#define THROTTLE_PIN 11 // Green
 
 // D0 to A0
 // D1 to A1
@@ -84,7 +84,7 @@
 #define MUST_HOLD_BUTTON_TO_ACTIVATE 0 // ms
 #define MUST_HOLD_BUTTON_TO_CHANGE 0 // ms
 #define MIN_SPEED_TO_ACTIVATE 40 // Km/h
-#define MAX_WAIT_THROTLE_RELEASE 5000 // ms
+#define MAX_WAIT_THROTTLE_RELEASE 5000 // ms
 #define MIN_SERVO_POSITION 20
 #define MAX_SERVO_POSITION 160
 #define MAX_SERVO_ADVANCE_PER_STEP 20
@@ -113,7 +113,7 @@ int targetRPM = 0;
 // HIGH: driver is not using this pedal
 // LOW: driver is pressing the pedal
 int brakePedalState = LOW;
-int throtlePedalState = LOW;
+int throttlePedalState = LOW;
 
 // Servo
 int servoPosition = 0;
@@ -130,7 +130,7 @@ boolean buttonStateChangeProcessed[] = {false, false, false, false};
 // 0: NO CONTROL
 // 1: SPEED
 // 2: RPM
-// 3: THROTLE servoPosition
+// 3: THROTTLE servoPosition
 int controlCode = 0;
 boolean releaseControlFeedback = false;
 
@@ -154,8 +154,8 @@ void setup() {
   Serial.println(F("* Initializing..."));
   delay(300);
 
-  // Servo for throtle control
-  Serial.println(F("* Initializing throtle servo..."));
+  // Servo for throttle control
+  Serial.println(F("* Initializing throttle servo..."));
   pinMode(SERVO_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
   servo.write(servoPosition);
@@ -198,10 +198,10 @@ void setup() {
   }
   delay(300);
 
-  Serial.println(F("* Initializing throtle pedal..."));
-  pinMode(THROTLE_PIN, INPUT_PULLUP);
+  Serial.println(F("* Initializing throttle pedal..."));
+  pinMode(THROTTLE_PIN, INPUT_PULLUP);
   while (true) {
-    if (digitalRead(THROTLE_PIN) == LOW) {
+    if (digitalRead(THROTTLE_PIN) == LOW) {
       tone(BUZZER_PIN, 1000, 100);
       break;
     }
@@ -271,9 +271,9 @@ void readPedals() {
   //Serial.println(F("*** Reading pedals ***"));
 
   brakePedalState = digitalRead(BRAKE_PIN);
-  throtlePedalState = digitalRead(THROTLE_PIN);
+  throttlePedalState = digitalRead(THROTTLE_PIN);
 
-  if (brakePedalState == LOW || throtlePedalState == LOW) {
+  if (brakePedalState == LOW || throttlePedalState == LOW) {
     controlCode = 0;
     evaluateControl();
   }
@@ -315,14 +315,14 @@ void releaseControl() {
   }
 }
 
-void waitThrotleReleaseThenActivate() {
-  unsigned long startWaitThrotleRelease = millis();
+void waitThrottleReleaseThenActivate() {
+  unsigned long startWaitThrottleRelease = millis();
 
-  while (digitalRead(THROTLE_PIN) == LOW && (millis() - startWaitThrotleRelease < MAX_WAIT_THROTLE_RELEASE)) {}
+  while (digitalRead(THROTTLE_PIN) == LOW && (millis() - startWaitThrottleRelease < MAX_WAIT_THROTTLE_RELEASE)) {}
 
   releaseControlFeedback = true;
 
-  if (millis() - startWaitThrotleRelease < MAX_WAIT_THROTLE_RELEASE) {
+  if (millis() - startWaitThrottleRelease < MAX_WAIT_THROTTLE_RELEASE) {
     Serial.println(F("*** Cruise control activated! ***"));
     delay(500);
     tone(BUZZER_PIN, 1500, 50);
@@ -332,7 +332,7 @@ void waitThrotleReleaseThenActivate() {
     controlCode = 1;
     evaluateControl();
   } else {
-    Serial.println(F("ERROR: Wait for too long before releasing THROTLE pedal. Command cancelled!"));
+    Serial.println(F("ERROR: Wait for too long before releasing THROTTLE pedal. Command cancelled!"));
     controlCode = 0;
     evaluateControl();
   }
@@ -455,7 +455,7 @@ void evaluateControl() {
       PIDController();
       servo.write(servoPosition);
       break;
-    case 3: // THROTLE servoPosition
+    case 3: // THROTTLE servoPosition
       releaseControlFeedback = true;
       servo.write(servoPosition);
       break;
@@ -477,8 +477,8 @@ void showStatus() {
   Serial.print(String(brakePedalState));
   Serial.println(F(""));
 
-  Serial.print(F("THROTLE pedal state: "));
-  Serial.print(String(throtlePedalState));
+  Serial.print(F("THROTTLE pedal state: "));
+  Serial.print(String(throttlePedalState));
   Serial.println(F(""));
 
   Serial.print(F("SERVO position: "));
@@ -526,7 +526,7 @@ void loop() {
               Serial.println(F("ACK Button A pressed (activate/set cruise control)"));
               tone(BUZZER_PIN, 1500, 50);
               delay(100);
-              waitThrotleReleaseThenActivate();
+              waitThrottleReleaseThenActivate();
             } else {
               releaseControlFeedback = true;
               releaseControl();
@@ -537,7 +537,7 @@ void loop() {
               Serial.println(F("ACK Button C pressed (reactivate/reset cruise control)"));
               tone(BUZZER_PIN, 1500, 50);
               delay(100);
-              waitThrotleReleaseThenActivate();
+              waitThrottleReleaseThenActivate();
             } else {
               releaseControlFeedback = true;
               releaseControl();
@@ -598,7 +598,7 @@ void loop() {
     evaluateControl();
   } else if (serialRecv.startsWith(F("p="))) {
     servoPosition = serialRecv.substring(2).toInt();
-    Serial.print(F("ACK command (THROTLE servoPosition set): "));
+    Serial.print(F("ACK command (THROTTLE servoPosition set): "));
     Serial.print(String(servoPosition));
     Serial.print(F(" ("));
     Serial.print(serialRecv);
