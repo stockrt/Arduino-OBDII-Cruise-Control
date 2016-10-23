@@ -7,7 +7,7 @@ index 4109533..83e9951 100644
  #define OBD_SERIAL_BAUDRATE 38400
  
 +
-+// Modifications to use with OBDII-Cruise-Control
++// Modifications to use with Arduino-OBDII-Cruise-Control
 +#include <SoftwareSerial.h>
 +extern SoftwareSerial btSerial;
 +#define OBDUART btSerial
